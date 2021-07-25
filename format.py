@@ -58,9 +58,6 @@ def generate_content(dict, year, month):
    名數）；「\033[1;35m▲\033[m」及「\033[1;32m▼\033[m」分別表示運量比去年同期成長及衰退最多之車站（數
   字為依成長或衰退百分比排名之名次）。
 
-   
-3. 第一次整理，若資料有錯誤或是排名錯誤，請來信告知，會盡快修改。
-
-4. 本文採用 cosmic 、 kuso10582 、 Wusher 及 ntuce016 板友的格式。'''
+3. 本文採用 cosmic 、 kuso10582 、 Wusher 及 ntuce016 板友的格式。'''
 
     return content
