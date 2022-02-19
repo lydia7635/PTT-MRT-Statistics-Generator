@@ -9,90 +9,107 @@ import pyperclip
 import wget
 from format import *
 
-def process_argument():
+def parse_argument():
     parser = argparse.ArgumentParser()
     parser.add_argument('year', help="輸入西元年或民國年", type=int)
     parser.add_argument('month', help="輸入月份", type=int)
-    return parser.parse_args()
 
-class month_data():
+    args = parser.parse_args()
+    if args.year < 1950:
+        args.year += 1911
+    return args
+
+class month_raw_data():
     def __init__(self, year, month):
+        if month == 0:
+            year -= 1
+            month = 12
+        self.time = { "year": year - 1911, "month": month }
+
         self.filename = wget.download(f"https://web.metro.taipei/RidershipPerStation/{year}{month:02}_cht.ods")
-        self.stat = get_data(self.filename)
-        self.date_num = len(list(filter(lambda x: x, self.stat['出站資料']))) - 1
+        self.raw = get_data(self.filename)
+
+        # lambda in filter: remove empty row
+        self.date_num = len(list(filter(lambda x: x, self.raw['出站資料']))) - 1
 
     def remove_file(self):
         os.unlink(self.filename)
 
-class station_data():
+class statistics():
     def __init__(self):
         self.station_dict = {}
 
-    def initialize(self, data):
-        # {station: [this_month, last_month, last_year, last_year_diff,
-        #   this_month_rank, last_month_rank, last_year_rank]}
-        for station in data.stat['出站資料'][0][1:]:
-            self.station_dict[station] = [0, 0, 0, 0, -1, -1, -1]
+    def init(self, data):
+        for station in data.raw['出站資料'][0][1:]:
+            self.station_dict[station] = {
+                "curr_month": 0,
+                "curr_month_rank": -1,
+                
+                "last_month": 0,
+                "last_month_diff": 0,
+                "last_month_rank": -1,
 
-    def calc_avg(self, data, list_idx):
+                "last_year": 0,
+                "last_year_diff": 0,
+                "last_year_diff_rank": -1,
+            }
+
+    def calc_avg(self, data, key):
         for date in range(data.date_num):
-            for idx, station in enumerate(data.stat['出站資料'][0][1:]):
-                self.station_dict[station][list_idx] += data.stat['出站資料'][date+1][idx+1]
-            for idx, station in enumerate(data.stat['進站資料'][0][1:]):
-                self.station_dict[station][list_idx] += data.stat['進站資料'][date+1][idx+1]
+            for idx, station in enumerate(data.raw['出站資料'][0][1:]):
+                self.station_dict[station][key] += data.raw['出站資料'][date+1][idx+1]
+            for idx, station in enumerate(data.raw['進站資料'][0][1:]):
+                self.station_dict[station][key] += data.raw['進站資料'][date+1][idx+1]
                 
         for station in self.station_dict.keys():
-            self.station_dict[station][list_idx] = int(self.station_dict[station][list_idx] / data.date_num + 0.5)
+            self.station_dict[station][key] = int(self.station_dict[station][key] / data.date_num + 0.5)
 
-    def calc_diff(self, this_month_avg_idx, last_avg_idx, last_diff_idx):
+    def calc_diff(self, comp_key, diff_key):
         for station in self.station_dict.keys():
-            this_month_avg = self.station_dict[station][this_month_avg_idx]
-            last_avg = self.station_dict[station][last_avg_idx]
-            self.station_dict[station][last_diff_idx] = (this_month_avg - last_avg)/last_avg * 100
+            curr_month_avg = self.station_dict[station]["curr_month"]
+            comp_avg = self.station_dict[station][comp_key]
+            self.station_dict[station][diff_key] = (curr_month_avg - comp_avg) / comp_avg * 100
     
     def print_items(self):
         for item in self.station_dict.items():
             print(item)
 
-    def sort_and_rank(self, sort_idx, rank_idx):
-        for idx, item in enumerate(sorted(self.station_dict.items(), key=lambda x: x[1][sort_idx], reverse=True)):
-            item[1][rank_idx] = idx + 1
+    def gen_rank(self, sort_key, rank_key):
+        for idx, item in enumerate(sorted(self.station_dict.items(), key=lambda x: x[1][sort_key], reverse=True)):
+            item[1][rank_key] = idx + 1
 
 
 def main():
-    args = process_argument()
+    args = parse_argument()
+    print(f"generate MRT data from {args.year}/{args.month:02}")
 
-    if args.year < 1950:
-        args.year += 1911
 
-    print(f"data from {args.year}/{args.month:02}")
+    curr_month_raw = month_raw_data(args.year, args.month)
+    last_month_raw = month_raw_data(args.year, args.month - 1)
+    last_year_raw  = month_raw_data(args.year - 1, args.month)
 
-    this_month = month_data(args.year, args.month)
-    if args.month - 1 > 0:
-        last_month = month_data(args.year, args.month - 1)
-    else:
-        last_month = month_data(args.year - 1, 12)
-    last_year  = month_data(args.year - 1, args.month)
+    curr_month_raw.remove_file()
+    last_month_raw.remove_file()
+    last_year_raw.remove_file()
 
-    dict = station_data()
-    dict.initialize(this_month)
+    stat = statistics()
+    stat.init(curr_month_raw)
 
-    dict.calc_avg(this_month, 0)
-    dict.calc_avg(last_month, 1)
-    dict.calc_avg(last_year,  2)
+    stat.calc_avg(curr_month_raw, "curr_month")
+    stat.calc_avg(last_month_raw, "last_month")
+    stat.calc_avg(last_year_raw,  "last_year")
 
-    dict.calc_diff(0, 2, 3)
+    stat.calc_diff("last_month", "last_month_diff")
+    stat.calc_diff("last_year", "last_year_diff")
 
-    dict.sort_and_rank(3, 6)
-    dict.sort_and_rank(1, 5)
-    dict.sort_and_rank(0, 4)
+    stat.gen_rank("last_year_diff", "last_year_diff_rank")
+    stat.gen_rank("last_month", "last_month_rank")
+    stat.gen_rank("curr_month", "curr_month_rank")
 
-    pyperclip.copy(generate_content(dict, args.year - 1911, args.month))
+    pyperclip.copy(generate_content(stat, curr_month_raw.time,
+                                          last_month_raw.time,
+                                          last_year_raw.time))
     print("\nCopied successfully!")
-    
-    this_month.remove_file()
-    last_month.remove_file()
-    last_year.remove_file()
 
 if __name__ == '__main__':
     main()
