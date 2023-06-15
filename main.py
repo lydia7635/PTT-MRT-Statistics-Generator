@@ -4,9 +4,10 @@
 
 import argparse
 import os
-from pyexcel_ods import get_data
+# from pyexcel_ods import get_data
 import pyperclip
 import wget
+import pandas as pd
 from format import *
 
 def parse_argument():
@@ -27,20 +28,19 @@ class month_raw_data():
         self.time = { "year": year - 1911, "month": month }
 
         self.filename = wget.download(f"https://web.metro.taipei/RidershipPerStation/{year}{month:02}_cht.ods")
-        self.raw = get_data(self.filename)
-
-        # lambda in filter: remove empty row
-        self.date_num = len(list(filter(lambda x: x, self.raw['出站資料']))) - 1
+        self.raw = pd.read_excel(self.filename, engine='odf', sheet_name=None)
+        self.remove_file()
+        # print(self.raw)
+        # print(self.raw['出站資料'].columns[1:])
 
     def remove_file(self):
         os.unlink(self.filename)
 
 class statistics():
-    def __init__(self):
+    def __init__(self, data):
         self.station_dict = {}
-
-    def init(self, data):
-        for station in data.raw['出站資料'][0][1:]:
+        self.station_name_list = data.raw['出站資料'].columns[1:]
+        for station in self.station_name_list:
             self.station_dict[station] = {
                 "curr_month": 0,
                 "curr_month_rank": -1,
@@ -55,14 +55,11 @@ class statistics():
             }
 
     def calc_avg(self, data, key):
-        for date in range(data.date_num):
-            for idx, station in enumerate(data.raw['出站資料'][0][1:]):
-                self.station_dict[station][key] += data.raw['出站資料'][date+1][idx+1]
-            for idx, station in enumerate(data.raw['進站資料'][0][1:]):
-                self.station_dict[station][key] += data.raw['進站資料'][date+1][idx+1]
-                
-        for station in self.station_dict.keys():
-            self.station_dict[station][key] = int(self.station_dict[station][key] / data.date_num + 0.5)
+        for station in self.station_name_list:
+            date_num = data.raw['出站資料'][station].count()
+            self.station_dict[station][key] += data.raw['出站資料'][station][:date_num].sum()
+            self.station_dict[station][key] += data.raw['進站資料'][station][:date_num].sum()
+            self.station_dict[station][key] = int(self.station_dict[station][key] / date_num + 0.5)
 
     def calc_diff(self, comp_key, diff_key):
         for station in self.station_dict.keys():
@@ -88,12 +85,7 @@ def main():
     last_month_raw = month_raw_data(args.year, args.month - 1)
     last_year_raw  = month_raw_data(args.year - 1, args.month)
 
-    curr_month_raw.remove_file()
-    last_month_raw.remove_file()
-    last_year_raw.remove_file()
-
-    stat = statistics()
-    stat.init(curr_month_raw)
+    stat = statistics(curr_month_raw)
 
     stat.calc_avg(curr_month_raw, "curr_month")
     stat.calc_avg(last_month_raw, "last_month")
