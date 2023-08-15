@@ -9,6 +9,7 @@ import pyperclip
 import wget
 import pandas as pd
 from format import *
+import const
 
 def parse_argument():
     parser = argparse.ArgumentParser()
@@ -29,9 +30,17 @@ class month_raw_data():
 
         self.filename = wget.download(f"https://web.metro.taipei/RidershipPerStation/{year}{month:02}_cht.ods")
         self.raw = pd.read_excel(self.filename, engine='odf', sheet_name=None)
+        self.fix_station_name()
         self.remove_file()
         # print(self.raw)
         # print(self.raw['出站資料'].columns[1:])
+
+    def fix_station_name(self):
+        station_num = len(self.raw['出站資料'].columns)
+        for i in range(1, station_num):
+            if self.raw['出站資料'].columns[i] not in const.STATION_NAME:
+                old_station_name = self.raw['出站資料'].columns[i]
+                self.raw['出站資料'].rename(columns={old_station_name: old_station_name[1:]}, inplace=True)
 
     def remove_file(self):
         os.unlink(self.filename)
@@ -57,15 +66,21 @@ class statistics():
     def calc_avg(self, data, key):
         for station in self.station_name_list:
             date_num = data.raw['出站資料'][station].count()
-            self.station_dict[station][key] += data.raw['出站資料'][station][:date_num].sum()
-            self.station_dict[station][key] += data.raw['進站資料'][station][:date_num].sum()
-            self.station_dict[station][key] = int(self.station_dict[station][key] / date_num + 0.5)
+            if date_num != 0:
+                self.station_dict[station][key] += data.raw['出站資料'][station][:date_num].sum()
+                self.station_dict[station][key] += data.raw['進站資料'][station][:date_num].sum()
+                self.station_dict[station][key] = int(self.station_dict[station][key] / date_num + 0.5)
+            else:
+                self.station_dict[station][key] = 0
 
     def calc_diff(self, comp_key, diff_key):
-        for station in self.station_dict.keys():
+        for station in self.station_name_list:
             curr_month_avg = self.station_dict[station]["curr_month"]
             comp_avg = self.station_dict[station][comp_key]
-            self.station_dict[station][diff_key] = (curr_month_avg - comp_avg) / comp_avg * 100
+            if comp_avg != 0:
+                self.station_dict[station][diff_key] = (curr_month_avg - comp_avg) / comp_avg * 100
+            else:
+                self.station_dict[station][diff_key] = 0
     
     def print_items(self):
         for item in self.station_dict.items():

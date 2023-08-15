@@ -17,8 +17,8 @@ def get_year_diff_rank_sign(last_year_diff, last_year_diff_rank):
     rank_str = ""
     if last_year_diff_rank <= 10 and last_year_diff > 0:
         rank_str = f"\033[1;35m▲{last_year_diff_rank}\033[m"
-    elif last_year_diff_rank > const.STATION_NUM - 10 and last_year_diff < 0:
-        rank_str = f"\033[1;32m▼{const.STATION_NUM + 1 - last_year_diff_rank}\033[m"
+    elif last_year_diff_rank > const.STATION_NUM - 10 - 11 and last_year_diff < 0:
+        rank_str = f"\033[1;32m▼{const.STATION_NUM + 1  - 11 - last_year_diff_rank}\033[m"
     return rank_str
 
 def generate_content(stat, curr_month_time, last_month_time, last_year_time):
