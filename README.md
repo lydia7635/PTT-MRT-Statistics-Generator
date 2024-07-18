@@ -21,3 +21,12 @@ $ python3 main.py [-h] year month
 # TODO
 - [ ] 支援雙色字
 - [ ] 標示通車以來最高運量
+
+# Note
+## 在 Windows 11 WSL2 設定出現亂碼
+解決方法：
+1. 開啟設定路徑：Settings -> Time and Language -> Language & region -> Administrative language settings -> Administrative -> Change system locale
+
+2. 勾選 Beta: Use Unicode UTF-8 for worldwide language support
+
+* Ref: https://github.com/microsoft/WSL/issues/11047#issuecomment-1946510386
